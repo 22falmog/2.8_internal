@@ -7,6 +7,20 @@ import sqlite3
 conn = sqlite3.connect('fantasy.DB')
 cursor = conn.cursor()
 
+
+def login_or_register():
+    while True:
+        choice = input("Do you want to \n(1) Login \n(2) Create a new account? \nEnter 1 or 2: ")
+
+        if choice == '1':
+            login_user()  
+            
+        elif choice == '2':
+            create_account() 
+            break
+        else:
+            print("Invalid input. Please enter 1 or 2.")
+
 def display_available_riders(cursor):
     cursor.execute("SELECT name, cost FROM riders")
     riders = cursor.fetchall()
