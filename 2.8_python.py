@@ -7,6 +7,24 @@ import sqlite3
 conn = sqlite3.connect('fantasy.DB')
 cursor = conn.cursor()
 
+def login_user(cursor):
+    username = input("Enter username: ")
+    password = input("Enter password: ")
+
+    cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+    user = cursor.fetchone()
+
+    if user:
+        print("Login successful!")
+        if user[3] == 1:
+            print("Logged in as admin.")
+        else:
+            print("Logged in as regular user.")
+        return user
+    else:
+        print("Invalid username or password.")
+        return None
+
 
 def login_or_register():
     while True:
@@ -14,7 +32,7 @@ def login_or_register():
 
         if choice == '1':
             login_user()  
-            
+
         elif choice == '2':
             create_account() 
             break
