@@ -25,16 +25,31 @@ def login_user(cursor):
         print("Invalid username or password.")
         return None
 
+def create_account(cursor, conn):
+    print("\n--- Create Account ---")
+    while True:
+        username = input("Enter a new username: ").strip()
+        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        if cursor.fetchone():
+            print("Username already taken. Please choose another.")
+        else:
+            break
 
-def login_or_register():
+    password = input("Enter a password: ").strip()
+
+    cursor.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, 0)", (username, password))
+    conn.commit()
+    print("Account created successfully! You can now log in.\n")
+
+def login_or_register(cursor, conn):
     while True:
         choice = input("Do you want to \n(1) Login \n(2) Create a new account? \nEnter 1 or 2: ")
 
         if choice == '1':
-            login_user()  
-
+            login_user(cursor)  
+            break
         elif choice == '2':
-            create_account() 
+            create_account(cursor, conn) 
             break
         else:
             print("Invalid input. Please enter 1 or 2.")
@@ -102,6 +117,7 @@ def select_riders(cursor):
         print(f"{str(i).ljust(4)} | {name.ljust(25)} | ${cost}")
 
    
+login_or_register(cursor, conn)
 select_riders(cursor)
 
 conn.close()
