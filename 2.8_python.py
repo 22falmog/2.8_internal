@@ -29,30 +29,53 @@ def create_account(cursor, conn):
     print("\n--- Create Account ---")
     while True:
         username = input("Enter a new username: ").strip()
+        if len(username) < 4:
+            print("Username must be at least 4 characters long.")
+            continue
+        if " " in username:
+            print("Username cannot contain spaces.")
+            continue
         cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
         if cursor.fetchone():
             print("Username already taken. Please choose another.")
         else:
             break
 
-    password = input("Enter a password: ").strip()
+    while True:
+        password = input("Enter a password: ").strip()
+        if len(password) < 6:
+            print("Password must be at least 6 characters long.")
+        elif " " in password:
+            print("Password cannot contain spaces.")
+        else:
+            break
 
     cursor.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, 0)", (username, password))
     conn.commit()
-    print("Account created successfully! You can now log in.\n")
+
+    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+    new_user = cursor.fetchone()
+
+    print("Account created successfully! You are now logged in.\n")
+    return new_user
+
 
 def login_or_register(cursor, conn):
     while True:
         choice = input("Do you want to \n(1) Login \n(2) Create a new account? \nEnter 1 or 2: ")
 
         if choice == '1':
-            login_user(cursor)  
-            break
+            user = login_user(cursor)
+            if user:
+                return user
+            else:
+                print("Login failed, please try again.")
         elif choice == '2':
-            create_account(cursor, conn) 
-            break
+            user = create_account(cursor, conn)
+            return user
         else:
             print("Invalid input. Please enter 1 or 2.")
+
 
 def display_available_riders(cursor):
     cursor.execute("SELECT name, cost FROM riders")
