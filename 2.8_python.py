@@ -16,11 +16,8 @@ def login_user(cursor):
 
     if user:
         print("Login successful!")
-        if user[3] == 1:
-            print("Logged in as admin.")
-        else:
-            print("Logged in as regular user.")
         return user
+
     else:
         print("Invalid username or password.")
         return None
@@ -75,6 +72,38 @@ def login_or_register(cursor, conn):
             return user
         else:
             print("Invalid input. Please enter 1 or 2.")
+
+def update_rider_points(cursor, conn):
+    print("\n--- Admin: Update Rider Points ---")
+
+    cursor.execute("SELECT rider_id, name, points FROM riders ORDER BY gender, points DESC")
+
+    riders = cursor.fetchall()
+
+    updated_ids = set()
+
+    for rider_id, name, current_points in riders:
+        if rider_id in updated_ids:
+            continue
+
+        print(f"\n{name} (Current points: {current_points})")
+        response = input("Enter new points, or type 'skip' or 'exit': ").strip()
+
+        if response.lower() == 'exit':
+            print("Exiting update session.")
+            break
+        elif response.lower() == 'skip':
+            continue
+
+        if not response.isdigit():
+            print("Invalid input. Points must be a whole number.")
+            continue
+
+        new_points = int(response)
+        cursor.execute("UPDATE riders SET points = ? WHERE rider_id = ?", (new_points, rider_id))
+        conn.commit()
+        updated_ids.add(rider_id)
+        print(f"{name}'s points updated to {new_points}.")
 
 
 def display_available_riders(cursor):
@@ -139,8 +168,30 @@ def select_riders(cursor):
     for i, (rider_id, name, cost, gender) in enumerate(team, start=1):
         print(f"{str(i).ljust(4)} | {name.ljust(25)} | ${cost}")
 
-   
-login_or_register(cursor, conn)
-select_riders(cursor)
+def admin_menu(cursor, conn):
+    while True:
+        print("\n--- Admin Panel ---")
+        print("1. Update rider points")
+        print("2. Exit admin panel")
+
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            update_rider_points(cursor, conn)
+        elif choice == '2':
+            print("Exiting admin panel...\n")
+            break
+        else:
+            print("Invalid option. Please enter 1 or 2.")
+
+
+user = login_or_register(cursor, conn)
+
+if user[3] == 1:  # is_admin
+    print("logged in as admin")
+    admin_menu(cursor, conn)
+else:
+    select_riders(cursor)
+
 
 conn.close()
