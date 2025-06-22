@@ -105,6 +105,21 @@ def update_rider_points(cursor, conn):
         updated_ids.add(rider_id)
         print(f"{name}'s points updated to {new_points}.")
 
+def admin_menu(cursor, conn):
+    while True:
+        print("\n--- Admin Panel ---")
+        print("1. Update rider points")
+        print("2. Exit admin panel")
+
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            update_rider_points(cursor, conn)
+        elif choice == '2':
+            print("Exiting admin panel...\n")
+            break
+        else:
+            print("Invalid option. Please enter 1 or 2.")
 
 def display_available_riders(cursor):
     cursor.execute("SELECT name, cost FROM riders")
@@ -165,33 +180,23 @@ def select_riders(cursor):
     print("Team complete!\n")
     print("No.  | Name                 | Cost")
     print("-------------------------------------")
-    for i, (rider_id, name, cost, gender) in enumerate(team, start=1):
+    for i, (rider_id, name, cost, gender, points) in enumerate(team, start=1):
         print(f"{str(i).ljust(4)} | {name.ljust(25)} | ${cost}")
+    print(f"\nRemaining budget: ${TEAM_BUDGET - total_cost}\n")
 
-def admin_menu(cursor, conn):
+def main():
     while True:
-        print("\n--- Admin Panel ---")
-        print("1. Update rider points")
-        print("2. Exit admin panel")
+        user = login_or_register(cursor, conn)
 
-        choice = input("Enter your choice: ")
-
-        if choice == '1':
-            update_rider_points(cursor, conn)
-        elif choice == '2':
-            print("Exiting admin panel...\n")
-            break
+        if user[3] == 1:  # is_admin
+            print("logged in as admin")
+            admin_menu(cursor, conn)
         else:
-            print("Invalid option. Please enter 1 or 2.")
+            select_riders(cursor)
 
+        print("\nyou have been logged out\n")
 
-user = login_or_register(cursor, conn)
-
-if user[3] == 1:  # is_admin
-    print("logged in as admin")
-    admin_menu(cursor, conn)
-else:
-    select_riders(cursor)
+main()
 
 
 conn.close()
