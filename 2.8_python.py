@@ -121,6 +121,32 @@ def admin_menu(cursor, conn):
         else:
             print("Invalid option. Please enter 1 or 2.")
 
+def user_menu(cursor, conn, user):
+    while True:
+        print("\n--- User Menu ---")
+        print("1. Build Your Team")
+        print("2. View Your Team")
+        print("3. Delete Your Team")
+        print("4. View Leaderboard")
+        print("5. Log Out")
+
+        choice = input("Select an option (1-5): ").strip()
+
+        if choice == '1':
+            print("Team building not yet connected.")  # replace with your function later
+        elif choice == '2':
+            print("Team viewing coming soon.")  # replace with view_team(user) later
+        elif choice == '3':
+            print("Delete team function not yet ready.")  # hook in later
+        elif choice == '4':
+            print("Leaderboard not built yet.")  # future function
+        elif choice == '5':
+            print("Logging out...\n")
+            break
+        else:
+            print("Invalid option. Please enter a number between 1 and 5.")
+
+
 def display_available_riders(cursor):
     cursor.execute("SELECT name, cost FROM riders")
     riders = cursor.fetchall()
@@ -192,8 +218,8 @@ def main():
             print("logged in as admin")
             admin_menu(cursor, conn)
         else:
-            select_riders(cursor)
-
+            user_menu(cursor, conn, user)
+        
         print("\nyou have been logged out\n")
 
 main()
