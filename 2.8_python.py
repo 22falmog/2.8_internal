@@ -230,6 +230,39 @@ def delete_team(cursor, conn, user):
     conn.commit()
     print("Your team has been deleted.")
 
+from datetime import datetime
+
+def show_race_calendar(cursor):
+    from datetime import datetime
+
+def show_race_calendar(cursor):
+    print("\n--- Race Calendar ---")
+    choice = input("Do you want to view (1) Upcoming Races or (2) Past Races? Enter 1 or 2: ").strip()
+
+    if choice not in ['1', '2']:
+        print("Invalid choice. Returning to menu.")
+        return
+
+    today = datetime.today().date()
+
+    if choice == '1':
+        cursor.execute("SELECT id, date, location FROM races WHERE date >= ? ORDER BY date ASC", (today.isoformat(),))
+        races = cursor.fetchall()
+        print("\nUpcoming Races:")
+    else:
+        cursor.execute("SELECT race_id, date, location FROM races WHERE date < ? ORDER BY date ASC", (today.isoformat(),))
+        races = cursor.fetchall()
+        print("\nPast Races:")
+
+    if not races:
+        print("No races found.")
+        return
+
+    print("\n  | Date       | Location")
+    print("----------------------------")
+    for race_id, date_str, location in races:
+        print(f"{location} - {date_str}")
+
 def user_menu(cursor, conn, user):
     while True:
         print("\n--- User Menu ---")
@@ -237,7 +270,8 @@ def user_menu(cursor, conn, user):
         print("2. View Your Team")
         print("3. Delete Your Team")
         print("4. View Leaderboard")
-        print("5. Log Out")
+        print("5. View Upcoming Races")
+        print("6. Log Out")
 
         choice = input("Select an option (1-5): ").strip()
 
@@ -250,6 +284,8 @@ def user_menu(cursor, conn, user):
         elif choice == '4':
             print("Leaderboard not built yet.")  # future function
         elif choice == '5':
+            show_race_calendar(cursor)
+        elif choice == '6':
             print("Logging out...\n")
             break
         else:
