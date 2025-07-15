@@ -235,33 +235,25 @@ from datetime import datetime
 def show_race_calendar(cursor):
     from datetime import datetime
 
-def show_race_calendar(cursor):
-    print("\n--- Race Calendar ---")
-    choice = input("Do you want to view (1) Upcoming Races or (2) Past Races? Enter 1 or 2: ").strip()
+def display_race_calendar(cursor):
+    cursor.execute("SELECT date, location FROM races ORDER BY date")
+    races = cursor.fetchall()
 
-    if choice not in ['1', '2']:
-        print("Invalid choice. Returning to menu.")
-        return
+    print("Location".ljust(25), "Date".ljust(15), "Status")
+    print(50 * "-")
 
     today = datetime.today().date()
 
-    if choice == '1':
-        cursor.execute("SELECT id, date, location FROM races WHERE date >= ? ORDER BY date ASC", (today.isoformat(),))
-        races = cursor.fetchall()
-        print("\nUpcoming Races:")
-    else:
-        cursor.execute("SELECT id, date, location FROM races WHERE date < ? ORDER BY date ASC", (today.isoformat(),))
-        races = cursor.fetchall()
-        print("\nPast Races:")
+    for date, location in races:
+        race_date = datetime.strptime(date, "%Y-%m-%d").date()
 
-    if not races:
-        print("No races found.")
-        return
+        if race_date >= today:
+            status = "\033[92m(upcoming)\033[0m"  # green
+        else:
+            status = "\033[91m(past)\033[0m"      # red
 
-    print("\n  | Date       | Location")
-    print("----------------------------")
-    for race_id, date_str, location in races:
-        print(f"{location} - {date_str}")
+        print(location.ljust(25), date.ljust(15), status)
+
 
 def user_menu(cursor, conn, user):
     while True:
@@ -284,7 +276,7 @@ def user_menu(cursor, conn, user):
         elif choice == '4':
             print("Leaderboard not built yet.")  # future function
         elif choice == '5':
-            show_race_calendar(cursor)
+            display_race_calendar(cursor)
         elif choice == '6':
             print("Logging out...\n")
             break
