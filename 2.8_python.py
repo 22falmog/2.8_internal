@@ -250,7 +250,7 @@ def show_race_calendar(cursor):
         races = cursor.fetchall()
         print("\nUpcoming Races:")
     else:
-        cursor.execute("SELECT race_id, date, location FROM races WHERE date < ? ORDER BY date ASC", (today.isoformat(),))
+        cursor.execute("SELECT id, date, location FROM races WHERE date < ? ORDER BY date ASC", (today.isoformat(),))
         races = cursor.fetchall()
         print("\nPast Races:")
 
