@@ -121,14 +121,15 @@ def admin_menu(cursor, conn):
 def display_available_riders(cursor, team):
     selected_ids = [rider[0] for rider in team]
 
-    cursor.execute("SELECT rider_id, name, cost FROM riders")
+    cursor.execute("SELECT rider_id, name, cost, gender, points FROM riders")
     all_riders = cursor.fetchall()
 
-    print("No.  | Name                 | Cost")
-    print("-------------------------------------")
-    for i, (rider_id, name, cost) in enumerate(all_riders, start=1):
+    print("No.  | Name                         | Cost      | Points   | Gender")
+    print("---------------------------------------------------------------------")
+    for i, (rider_id, name, cost, gender, points) in enumerate(all_riders, start=1):
         if rider_id not in selected_ids:
-            print(f"{str(i).ljust(4)} | {name.ljust(25)} | ${cost}")
+            print(f"{str(i).ljust(4)} | {name.ljust(28)} | ${str(cost).ljust(8)} | {str(points).ljust(8)} | {gender}")
+
 
 
 def fetch_rider_by_id(cursor, rider_id):
@@ -223,7 +224,7 @@ def view_team(cursor, user):
     total_cost = sum(rider[2] for rider in team)
 
     print("Your Team:\n")
-    print("No.  | Name                 | Cost")
+    print("No.  | Name                      | Cost")
     print("-------------------------------------")
     for i, (rider_id, name, cost, gender, points) in enumerate(team, start=1):
         print(f"{str(i).ljust(4)} | {name.ljust(25)} | ${cost}")
