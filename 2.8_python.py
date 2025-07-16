@@ -118,14 +118,18 @@ def admin_menu(cursor, conn):
         else:
             print("Invalid option. Please enter 1 or 2.")
 
-def display_available_riders(cursor):
+def display_available_riders(cursor, team):
+    selected_ids = [rider[0] for rider in team]
+
     cursor.execute("SELECT rider_id, name, cost FROM riders")
-    riders = cursor.fetchall()
+    all_riders = cursor.fetchall()
 
     print("No.  | Name                 | Cost")
     print("-------------------------------------")
-    for i, (rider_id, name, cost) in enumerate(riders, start=1):
-        print(f"{str(rider_id).ljust(4)} | {name.ljust(25)} | ${cost}")
+    for i, (rider_id, name, cost) in enumerate(all_riders, start=1):
+        if rider_id not in selected_ids:
+            print(f"{str(i).ljust(4)} | {name.ljust(25)} | ${cost}")
+
 
 def fetch_rider_by_id(cursor, rider_id):
     cursor.execute("SELECT * FROM riders WHERE rider_id = ?", (rider_id,))
@@ -157,7 +161,7 @@ def select_riders(cursor, conn, user):
     num_women = 0
 
     while len(team) < TEAM_SIZE:
-        display_available_riders(cursor)
+        display_available_riders(cursor, team)
 
         rider_id = input("\nEnter rider ID: ").strip()
 
