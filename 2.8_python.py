@@ -155,11 +155,36 @@ def load_user_team(cursor, user_id):
     """, (user_id,))
     return cursor.fetchall()
 
+def view_team(cursor, user):
+    team = load_user_team(cursor, user[0])
+    if not team:
+        print("You don't have a team yet. Build one first!")
+        return
+
+    total_cost = sum(rider[2] for rider in team)
+    sorted_team = sorted(team, key=lambda rider: (rider[3] == 'F', -rider[4]))
+
+
+    print("\nYour Fantasy Team:\n")
+    print("No.  | Name                  | Cost     | Points   | Gender")
+    print("---------------------------------------------------------------")
+    for i, (rider_id, name, cost, gender, points) in enumerate(sorted_team, start=1):
+        print(f"{str(i).ljust(4)} | {name.ljust(20)} | ${str(cost).ljust(8)} | {str(points).ljust(8)} | {gender}")
+    print(f"\nTotal team cost: ${total_cost}")
+
 def select_riders(cursor, conn, user):
     team = []
     total_cost = 0
     num_men = 0
     num_women = 0
+
+    cursor.execute("SELECT * FROM user_teams WHERE user_id = ?", (user[0],))
+    exists = cursor.fetchone()
+
+    if exists:
+        print("\nPlease delete your existing team before creating a new one.")
+        input("Press Enter to return to the menu.")
+        return
 
     while len(team) < TEAM_SIZE:
         display_available_riders(cursor, team)
@@ -204,31 +229,12 @@ def select_riders(cursor, conn, user):
             num_women += 1
 
         print(f"Added {rider[1]} to your team! Remaining budget: ${TEAM_BUDGET - total_cost}\n")
-
-    print("Team complete!\n")
-    print("No.  | Name                 | Cost")
-    print("-------------------------------------")
-    for i, (rider_id, name, cost, gender, points) in enumerate(team, start=1):
-        print(f"{str(i).ljust(4)} | {name.ljust(25)} | ${cost}")
-    print(f"\nRemaining budget: ${TEAM_BUDGET - total_cost}\n")
-
+    
     # Save team to DB
     save_user_team(cursor, conn, user[0], team)
 
-def view_team(cursor, user):
-    team = load_user_team(cursor, user[0])
-    if not team:
-        print("You don't have a team yet. Build one first!")
-        return
-
-    total_cost = sum(rider[2] for rider in team)
-
-    print("Your Team:\n")
-    print("No.  | Name                      | Cost")
-    print("-------------------------------------")
-    for i, (rider_id, name, cost, gender, points) in enumerate(team, start=1):
-        print(f"{str(i).ljust(4)} | {name.ljust(25)} | ${cost}")
-    print(f"\nTotal team cost: ${total_cost}")
+    print("Team complete!\n")
+    view_team(cursor, user)
 
 def delete_team(cursor, conn, user):
     cursor.execute("DELETE FROM user_teams WHERE user_id = ?", (user[0],))
