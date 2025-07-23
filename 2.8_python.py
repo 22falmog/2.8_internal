@@ -131,7 +131,6 @@ def display_available_riders(cursor, team):
             print(f"{str(i).ljust(4)} | {name.ljust(28)} | ${str(cost).ljust(8)} | {str(points).ljust(8)} | {gender}")
 
 
-
 def fetch_rider_by_id(cursor, rider_id):
     cursor.execute("SELECT * FROM riders WHERE rider_id = ?", (rider_id,))
     return cursor.fetchone()
@@ -187,8 +186,9 @@ def select_riders(cursor, conn, user):
         return
 
     while len(team) < TEAM_SIZE:
+        #remaining_budget = TEAM_BUDGET - total_cost
         display_available_riders(cursor, team)
-
+        
         rider_id = input("\nEnter rider ID: ").strip()
 
         if not rider_id.isdigit():
