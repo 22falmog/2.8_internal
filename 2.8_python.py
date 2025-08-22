@@ -67,6 +67,7 @@ def login_or_register(cursor, conn):
                 print("Login failed, please try again.")
         elif choice == '2':
             user = create_account(cursor, conn)
+            tutorial()
             return user
         else:
             print("Invalid input. Please enter 1 or 2.")
@@ -118,17 +119,40 @@ def admin_menu(cursor, conn):
         else:
             print("Invalid option. Please enter 1 or 2.")
 
-def display_available_riders(cursor, team):
+def display_available_riders(cursor, team, remaining_budget, num_men, num_women):
     selected_ids = [rider[0] for rider in team]
 
     cursor.execute("SELECT rider_id, name, cost, gender, points FROM riders")
     all_riders = cursor.fetchall()
 
-    print("No.  | Name                         | Cost      | Points   | Gender")
-    print("---------------------------------------------------------------------")
-    for i, (rider_id, name, cost, gender, points) in enumerate(all_riders, start=1):
-        if rider_id not in selected_ids:
-            print(f"{str(i).ljust(4)} | {name.ljust(28)} | ${str(cost).ljust(8)} | {str(points).ljust(8)} | {gender}")
+    print("No.  | Name                         | Cost      | Points   | Gender | Status")
+    print("-------------------------------------------------------------------------------")
+    
+    display_number = 1
+    display_map = {}
+
+    for rider_id, name, cost, gender, points in all_riders:
+        if rider_id in selected_ids:
+            continue
+
+        too_expensive = cost > remaining_budget
+        gender_limit_reached = (gender == 'M' and num_men >= MAX_MEN) or (gender == 'F' and num_women >= MAX_WOMEN)
+
+        label = ""
+        color_start = ""
+        color_end = ""
+
+        if too_expensive or gender_limit_reached:
+            label = "(Too expensive)" if too_expensive else "(Gender full)"
+            color_start = "\033[91m"
+            color_end = "\033[0m"
+
+        print(f"{color_start}{str(display_number).ljust(4)} | {name.ljust(28)} | ${str(cost).ljust(8)} | {str(points).ljust(8)} | {gender}     | {label}{color_end}")
+
+        display_map[display_number] = rider_id
+        display_number += 1
+
+    return display_map
 
 
 def fetch_rider_by_id(cursor, rider_id):
@@ -187,13 +211,17 @@ def select_riders(cursor, conn, user):
 
     while len(team) < TEAM_SIZE:
         #remaining_budget = TEAM_BUDGET - total_cost
-        display_available_riders(cursor, team)
         
-        rider_id = input("\nEnter rider ID: ").strip()
+        display_map = display_available_riders(cursor, team, TEAM_BUDGET - total_cost, num_men, num_women)
 
-        if not rider_id.isdigit():
-            print("Please enter a valid number.")
+        rider_number = input("\nEnter rider number: ").strip()
+
+        if not rider_number.isdigit() or int(rider_number) not in display_map:
+            print("Invalid selection.")
             continue
+
+        rider_id = display_map[int(rider_number)]
+
 
         rider = fetch_rider_by_id(cursor, int(rider_id))
         if not rider:
@@ -241,6 +269,15 @@ def delete_team(cursor, conn, user):
     conn.commit()
     print("Your team has been deleted.")
 
+def view_leaderboard(cursor):
+    cursor.execute("SELECT username, total_points FROM leaderboard_view;")
+
+    results = cursor.fetchall()
+
+    print("FinnBike Fantasy Leaderboard")
+    for position, (username, points) in enumerate(results, start=1):
+        print(f"{position}. {username} - {points} points")
+
 from datetime import datetime
 
 def show_race_calendar(cursor):
@@ -265,16 +302,58 @@ def display_race_calendar(cursor):
 
         print(location.ljust(25), date.ljust(15), status)
 
+def tutorial():
+    sections = [
+        """
+Welcome to Fantasy MTB!
+Your goal is to build the best team within your budget and finish the season with the most points.
+        """,
+
+        """
+TEAM CREATION:
+- Budget Limit: You have a fixed budget of 1.5 million to spend on riders.
+- Team Size: You must fill all 6 spots in your team.
+- Gender Rules: You must have 4 male, and 2 female riders in your team.
+- Costs: Each rider has a unique cost, so choose wisely to balance talent and budget.
+        """,
+
+        """
+SCORING:
+- Riders earn points based on their real-life race result.
+- Your total score is the points your riders earned in races while they were on your team, added together.
+        """,
+
+        """
+LEADERBOARDS:
+- Shows the top players and their scores.
+- Updates after each event or scoring period.
+- Ties are broken by total budget spent (less spent wins).
+        """,
+
+        """
+TIPS:
+- Watch your budget — once it's gone, you can't add more riders.
+- Balance proven riders with potential rising stars.
+- Keep an eye on your competitors' scores.
+        """
+    ]
+
+    for section in sections:
+        print("")
+        print(section.strip())
+        input("\nPress Enter to continue > ")
+
 
 def user_menu(cursor, conn, user):
     while True:
-        print("\n--- User Menu ---")
+        print("\n--- FinnBike Fantasy Menu ---\n")
         print("1. Build Your Team")
         print("2. View Your Team")
         print("3. Delete Your Team")
         print("4. View Leaderboard")
         print("5. View Upcoming Races")
-        print("6. Log Out")
+        print("6. view tutorial")
+        print("7. Log Out\n")
 
         choice = input("Select an option (1-5): ").strip()
 
@@ -285,10 +364,12 @@ def user_menu(cursor, conn, user):
         elif choice == '3':
             delete_team(cursor, conn, user)
         elif choice == '4':
-            print("Leaderboard not built yet.")  # future function
+            view_leaderboard(cursor)
         elif choice == '5':
             display_race_calendar(cursor)
         elif choice == '6':
+            tutorial()
+        elif choice == '7':
             print("Logging out...\n")
             break
         else:
