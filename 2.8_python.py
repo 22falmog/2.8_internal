@@ -119,15 +119,20 @@ def admin_menu(cursor, conn):
         else:
             print("Invalid option. Please enter 1 or 2.")
 
-def display_available_riders(cursor, team, remaining_budget, num_men, num_women):
+def display_available_riders(cursor, team, remaining_budget, num_men, num_women, gender_filter=None):
     selected_ids = [rider[0] for rider in team]
 
-    cursor.execute("SELECT rider_id, name, cost, gender, points FROM riders")
+    # Adjust query based on gender
+    if gender_filter in ('M', 'F'):
+        cursor.execute("SELECT rider_id, name, cost, gender, points FROM riders WHERE gender = ?", (gender_filter,))
+    else:
+        cursor.execute("SELECT rider_id, name, cost, gender, points FROM riders")
+    
     all_riders = cursor.fetchall()
-
+    
     print("No.  | Name                         | Cost      | Points   | Gender | Status")
     print("-------------------------------------------------------------------------------")
-    
+   
     display_number = 1
     display_map = {}
 
@@ -178,15 +183,17 @@ def load_user_team(cursor, user_id):
     """, (user_id,))
     return cursor.fetchall()
 
-def view_team(cursor, user):
-    team = load_user_team(cursor, user[0])
+def view_team(cursor, user, team=None):
+
+    if team is None:
+        team = load_user_team(cursor, user[0])
+
     if not team:
         print("You don't have a team yet. Build one first!")
         return
 
     total_cost = sum(rider[2] for rider in team)
     sorted_team = sorted(team, key=lambda rider: (rider[3] == 'F', -rider[4]))
-
 
     print("\nYour Fantasy Team:\n")
     print("No.  | Name                  | Cost     | Points   | Gender")
@@ -195,74 +202,170 @@ def view_team(cursor, user):
         print(f"{str(i).ljust(4)} | {name.ljust(20)} | ${str(cost).ljust(8)} | {str(points).ljust(8)} | {gender}")
     print(f"\nTotal team cost: ${total_cost}")
 
-def select_riders(cursor, conn, user):
+
+def display_team_status(team, total_cost, num_men, num_women):
+    # Progress bar
+    team_slots = ['■' if i < len(team) else '□' for i in range(TEAM_SIZE)]
+    progress = ' '.join(team_slots)
+    print("\n--- Your Team Status ---")
+    print(f"Team: {len(team)}/{TEAM_SIZE} | {progress}")
+    print(f"Budget remaining: ${TEAM_BUDGET - total_cost}")
+    print(f"Men: {num_men}/{MAX_MEN} | Women: {num_women}/{MAX_WOMEN}")
+    print("------------------------\n")
+
+def add_male_rider(cursor, team, total_cost, num_men, num_women):
+    if num_men >= MAX_MEN:
+        print("\n⚠️ You already have the maximum number of male riders ({}).".format(MAX_MEN))
+        print("Delete a male rider before adding another.\n")
+        return None, total_cost, num_men, num_women
+
+    remaining_budget = TEAM_BUDGET - total_cost
+    display_map = display_available_riders(cursor, team, remaining_budget, num_men, num_women, gender_filter='M')
+
+    if not display_map:
+        print("No available male riders to select.\n")
+        return None, total_cost, num_men, num_women
+
+    rider_number = input("\nEnter the number of the male rider to add (or press Enter to cancel): ").strip()
+
+    if rider_number == "":
+        print("Cancelled.\n")
+        return None, total_cost, num_men, num_women
+
+    if not rider_number.isdigit() or int(rider_number) not in display_map:
+        print("Invalid selection.\n")
+        return None, total_cost, num_men, num_women
+    rider_id = display_map[int(rider_number)]
+    rider = fetch_rider_by_id(cursor, rider_id)
+
+    if rider in team:
+        print("Can't select the same rider twice.\n")
+        return None, total_cost, num_men, num_women
+
+    if total_cost + rider[2] > TEAM_BUDGET:
+        print(f"Rider costs ${rider[2]}, you only have ${TEAM_BUDGET - total_cost} left.\n")
+        return None, total_cost, num_men, num_women
+
+    if num_men >= MAX_MEN:
+        print("You already have the maximum number of men.\n")
+        return None, total_cost, num_men, num_women
+
+    team.append(rider)
+    total_cost += rider[2]
+    num_men += 1
+    print(f"Added {rider[1]} to your team!\n")
+    return rider, total_cost, num_men, num_women
+
+
+def add_female_rider(cursor, team, total_cost, num_men, num_women):
+    if num_women >= MAX_WOMEN:
+        print("\n⚠️ You already have the maximum number of female riders ({}).".format(MAX_WOMEN))
+        print("Delete a female rider before adding another.\n")
+        return None, total_cost, num_men, num_women
+ 
+    remaining_budget = TEAM_BUDGET - total_cost
+    display_map = display_available_riders(cursor, team, remaining_budget, num_men, num_women, gender_filter='F')
+
+    if not display_map:
+        print("No available female riders to select.\n")
+        return None, total_cost, num_men, num_women
+
+    rider_number = input("\nEnter the number of the female rider to add (or press enter to cancel): ").strip()
+
+    if rider_number == "":
+        print("Cancelled.\n")
+        return None, total_cost, num_men, num_women
+
+    if not rider_number.isdigit() or int(rider_number) not in display_map:
+        print("Invalid selection.\n")
+        return None, total_cost, num_men, num_women
+    rider_id = display_map[int(rider_number)]
+    rider = fetch_rider_by_id(cursor, rider_id)
+
+    if rider in team:
+        print("Can't select the same rider twice.\n")
+        return None, total_cost, num_men, num_women
+
+    if total_cost + rider[2] > TEAM_BUDGET:
+        print(f"Rider costs ${rider[2]}, you only have ${TEAM_BUDGET - total_cost} left.\n")
+        return None, total_cost, num_men, num_women
+
+    if num_women >= MAX_WOMEN:
+        print("You already have the maximum number of women.\n")
+        return None, total_cost, num_men, num_women
+
+    team.append(rider)
+    total_cost += rider[2]
+    num_women += 1
+    print(f"Added {rider[1]} to your team!\n")
+    return rider, total_cost, num_men, num_women
+
+
+def delete_rider(team, total_cost, num_men, num_women, cursor, user):
+    if not team:
+        print("Your team is empty.\n")
+        return total_cost, num_men, num_women
+
+    # Display team using view_team style
+    view_team(cursor, user, team)
+
+    choice = input("\nEnter the number of the rider to remove: ").strip()
+    if not choice.isdigit() or int(choice) < 1 or int(choice) > len(team):
+        print("Invalid selection.\n")
+        return total_cost, num_men, num_women
+
+    rider = team.pop(int(choice) - 1)
+    total_cost -= rider[2]
+    if rider[3] == 'M':
+        num_men -= 1
+    else:
+        num_women -= 1
+
+    print(f"Removed {rider[1]} from your team.\n")
+    return total_cost, num_men, num_women
+
+
+def build_team(cursor, conn, user):
+    # Load existing team if any
+    existing_team = load_user_team(cursor, user[0])
+    if existing_team:
+        print("\nPlease delete your existing team before creating a new one.")
+        input("Press Enter to return to the menu.")
+        return
+
     team = []
     total_cost = 0
     num_men = 0
     num_women = 0
 
-    cursor.execute("SELECT * FROM user_teams WHERE user_id = ?", (user[0],))
-    exists = cursor.fetchone()
-
-    if exists:
-        print("\nPlease delete your existing team before creating a new one.")
-        input("Press Enter to return to the menu.")
-        return
-
     while len(team) < TEAM_SIZE:
-        #remaining_budget = TEAM_BUDGET - total_cost
-        
-        display_map = display_available_riders(cursor, team, TEAM_BUDGET - total_cost, num_men, num_women)
+        display_team_status(team, total_cost, num_men, num_women)
+        print("Options:")
+        print("1. Add Male Rider")
+        print("2. Add Female Rider")
+        print("3. Delete a Rider")
+        print("4. Exit Team Builder")
 
-        rider_number = input("\nEnter rider number: ").strip()
+        choice = input("\nEnter your choice: ").strip()
 
-        if not rider_number.isdigit() or int(rider_number) not in display_map:
-            print("Invalid selection.")
-            continue
-
-        rider_id = display_map[int(rider_number)]
-
-
-        rider = fetch_rider_by_id(cursor, int(rider_id))
-        if not rider:
-            print("Rider not found.")
-            continue
-
-        # check if rider already in team
-        if rider in team:
-            print("Can't select rider twice.")
-            input("Press Enter to continue > ")
-            continue
-
-        # Check cost and team size
-        if total_cost + rider[2] > TEAM_BUDGET:
-            print(f"Rider costs {rider[2]}. You only have ${TEAM_BUDGET - total_cost} left.")
-            input("Press Enter to continue > ")
-            continue
-
-        # Check gender
-        if rider[3] == 'M' and num_men >= MAX_MEN:
-            print("You already have maximum men on your team!")
-            continue
-        elif rider[3] == 'F' and num_women >= MAX_WOMEN:
-            print("You already have maximum women on your team!")
-            continue
-
-        # Add rider to team and update totals
-        team.append(rider)
-        total_cost += rider[2]
-        if rider[3] == 'M':
-            num_men += 1
+        if choice == '1':
+            rider, total_cost, num_men, num_women = add_male_rider(cursor, team, total_cost, num_men, num_women)
+        elif choice == '2':
+            rider, total_cost, num_men, num_women = add_female_rider(cursor, team, total_cost, num_men, num_women)
+        elif choice == '3':
+            total_cost, num_men, num_women = delete_rider(team, total_cost, num_men, num_women, cursor, user)
+        elif choice == '4':
+            print("Exiting team builder.\n")
+            return
         else:
-            num_women += 1
+            print("Invalid choice.\n")
+            continue
 
-        print(f"Added {rider[1]} to your team! Remaining budget: ${TEAM_BUDGET - total_cost}\n")
-    
-    # Save team to DB
+    # Save completed team
     save_user_team(cursor, conn, user[0], team)
-
     print("Team complete!\n")
     view_team(cursor, user)
+
 
 def delete_team(cursor, conn, user):
     cursor.execute("DELETE FROM user_teams WHERE user_id = ?", (user[0],))
@@ -358,7 +461,7 @@ def user_menu(cursor, conn, user):
         choice = input("Select an option (1-5): ").strip()
 
         if choice == '1':
-            select_riders(cursor, conn, user)
+            build_team(cursor, conn, user)
         elif choice == '2':
             view_team(cursor, user)
         elif choice == '3':
