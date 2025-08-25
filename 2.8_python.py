@@ -206,63 +206,26 @@ def display_available_riders(cursor, team, remaining_budget, num_men, num_women,
 
     return display_map
 
-def add_male_rider(cursor, team, total_cost, num_men, num_women):
-    if num_men >= MAX_MEN:
-        print("\nYou already have the maximum number of male riders ({}).".format(MAX_MEN))
+def add_rider(cursor, team, total_cost, num_men, num_women, gender):
+    # Check gender limit
+    if gender == 'M' and num_men >= MAX_MEN:
+        print(f"\nYou already have the maximum number of male riders ({MAX_MEN}).")
         print("Delete a male rider before adding another.\n")
         return None, total_cost, num_men, num_women
-
-    remaining_budget = TEAM_BUDGET - total_cost
-    display_map = display_available_riders(cursor, team, remaining_budget, num_men, num_women, gender_filter='M')
-
-    if not display_map:
-        print("No available male riders to select.\n")
-        return None, total_cost, num_men, num_women
-
-    rider_number = input("\nEnter the number of the male rider to add (or press Enter to cancel): ").strip()
-
-    if rider_number == "":
-        print("Cancelled.\n")
-        return None, total_cost, num_men, num_women
-
-    if not rider_number.isdigit() or int(rider_number) not in display_map:
-        print("Invalid selection.\n")
-        return None, total_cost, num_men, num_women
-    rider_id = display_map[int(rider_number)]
-    rider = fetch_rider_by_id(cursor, rider_id)
-
-    if rider in team:
-        print("Can't select the same rider twice.\n")
-        return None, total_cost, num_men, num_women
-
-    if total_cost + rider[2] > TEAM_BUDGET:
-        print(f"Rider costs ${rider[2]}, you only have ${TEAM_BUDGET - total_cost} left.\n")
-        return None, total_cost, num_men, num_women
-
-    if num_men >= MAX_MEN:
-        print("You already have the maximum number of men.\n")
-        return None, total_cost, num_men, num_women
-
-    team.append(rider)
-    total_cost += rider[2]
-    num_men += 1
-    print(f"Added {rider[1]} to your team!\n")
-    return rider, total_cost, num_men, num_women
-
-def add_female_rider(cursor, team, total_cost, num_men, num_women):
-    if num_women >= MAX_WOMEN:
-        print("\nYou already have the maximum number of female riders ({}).".format(MAX_WOMEN))
+    if gender == 'F' and num_women >= MAX_WOMEN:
+        print(f"\nYou already have the maximum number of female riders ({MAX_WOMEN}).")
         print("Delete a female rider before adding another.\n")
         return None, total_cost, num_men, num_women
- 
+
+    # Display available riders of chosen gender
     remaining_budget = TEAM_BUDGET - total_cost
-    display_map = display_available_riders(cursor, team, remaining_budget, num_men, num_women, gender_filter='F')
+    display_map = display_available_riders(cursor, team, remaining_budget, num_men, num_women, gender_filter=gender)
 
     if not display_map:
-        print("No available female riders to select.\n")
+        print(f"No available {'male' if gender == 'M' else 'female'} riders to select.\n")
         return None, total_cost, num_men, num_women
 
-    rider_number = input("\nEnter the number of the female rider to add (or press enter to cancel): ").strip()
+    rider_number = input(f"\nEnter the number of the {'male' if gender == 'M' else 'female'} rider to add (or press Enter to cancel): ").strip()
 
     if rider_number == "":
         print("Cancelled.\n")
@@ -271,9 +234,11 @@ def add_female_rider(cursor, team, total_cost, num_men, num_women):
     if not rider_number.isdigit() or int(rider_number) not in display_map:
         print("Invalid selection.\n")
         return None, total_cost, num_men, num_women
+
     rider_id = display_map[int(rider_number)]
     rider = fetch_rider_by_id(cursor, rider_id)
 
+    # Validations
     if rider in team:
         print("Can't select the same rider twice.\n")
         return None, total_cost, num_men, num_women
@@ -282,15 +247,17 @@ def add_female_rider(cursor, team, total_cost, num_men, num_women):
         print(f"Rider costs ${rider[2]}, you only have ${TEAM_BUDGET - total_cost} left.\n")
         return None, total_cost, num_men, num_women
 
-    if num_women >= MAX_WOMEN:
-        print("You already have the maximum number of women.\n")
-        return None, total_cost, num_men, num_women
-
+    # Add rider
     team.append(rider)
     total_cost += rider[2]
-    num_women += 1
+    if gender == 'M':
+        num_men += 1
+    else:
+        num_women += 1
+
     print(f"Added {rider[1]} to your team!\n")
     return rider, total_cost, num_men, num_women
+
 
 def delete_rider(team, total_cost, num_men, num_women, cursor, user):
     if not team:
@@ -339,9 +306,9 @@ def build_team(cursor, conn, user):
         choice = input("\nEnter your choice: ").strip()
 
         if choice == '1':
-            rider, total_cost, num_men, num_women = add_male_rider(cursor, team, total_cost, num_men, num_women)
+            rider, total_cost, num_men, num_women = add_rider(cursor, team, total_cost, num_men, num_women, 'M')
         elif choice == '2':
-            rider, total_cost, num_men, num_women = add_female_rider(cursor, team, total_cost, num_men, num_women)
+            rider, total_cost, num_men, num_women = add_rider(cursor, team, total_cost, num_men, num_women, 'F')
         elif choice == '3':
             total_cost, num_men, num_women = delete_rider(team, total_cost, num_men, num_women, cursor, user)
         elif choice == '4':
