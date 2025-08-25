@@ -73,7 +73,6 @@ def login_or_register(cursor, conn):
             print("Invalid input. Please enter 1 or 2.")
 
 def update_rider_results(cursor, conn):
-    from datetime import datetime
 
     # Step 1: Show upcoming or unscored races
     cursor.execute("SELECT id, location, date FROM races ORDER BY date")
@@ -158,9 +157,6 @@ def admin_menu(cursor, conn):
 
             # Update rider points
             update_rider_results(cursor, conn)
-
-            # Update user scores for this race
-            update_user_race_scores(cursor, conn, race_id)
 
             print(f"User scores updated for race ID {race_id}.\n")
         
@@ -532,6 +528,7 @@ TIPS:
 def update_user_race_scores(cursor, conn, race_id):
     """
     After a race is completed, calculate and store points for each user.
+    Recalculates points if called again for the same race.
     """
 
     # Get rider results for this race
@@ -558,7 +555,13 @@ def update_user_race_scores(cursor, conn, race_id):
         # Sum points for this user's riders
         total_points = sum(race_results.get(rider_id, 0) for rider_id in team_riders)
 
-        # Insert into user_race_scores
+        # Remove old entry first (if it exists)
+        cursor.execute("""
+            DELETE FROM user_race_scores
+            WHERE user_id = ? AND race_id = ?
+        """, (user_id, race_id))
+
+        # Insert updated points
         cursor.execute("""
             INSERT INTO user_race_scores (user_id, race_id, points)
             VALUES (?, ?, ?)
@@ -579,7 +582,7 @@ def user_menu(cursor, conn, user):
         print("6. view tutorial")
         print("7. Log Out\n")
 
-        choice = input("Select an option (1-5): ").strip()
+        choice = input("Select an option (1-7): ").strip()
 
         if choice == '1':
             build_team(cursor, conn, user)
