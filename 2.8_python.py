@@ -72,52 +72,127 @@ def login_or_register(cursor, conn):
         else:
             print("Invalid input. Please enter 1 or 2.")
 
-def update_rider_points(cursor, conn):
-    print("\n--- Admin: Update Rider Points ---")
+def update_rider_results(cursor, conn):
+    from datetime import datetime
 
-    cursor.execute("SELECT rider_id, name, points FROM riders ORDER BY gender, points DESC")
+    # Step 1: Show upcoming or unscored races
+    cursor.execute("SELECT id, location, date FROM races ORDER BY date")
+    races = cursor.fetchall()
+
+    if not races:
+        print("No races found.")
+        return
+
+    print("\nAvailable races:")
+    for i, (race_id, location, date) in enumerate(races, start=1):
+        race_date = datetime.strptime(date, "%Y-%m-%d").date()
+        status = "Upcoming" if race_date >= datetime.today().date() else "Completed"
+        print(f"{i}. {location} ({date}) - {status}")
+
+    choice = input("\nEnter the number of the race to enter results for: ").strip()
+    if not choice.isdigit() or int(choice) < 1 or int(choice) > len(races):
+        print("Invalid selection.\n")
+        return
+
+    race_id, location, date = races[int(choice) - 1]
+    print(f"\nEntering results for {location} ({date})\n")
+
+    # Step 2: Get all riders
+    cursor.execute("SELECT rider_id, name FROM riders ORDER BY name")
     riders = cursor.fetchall()
 
-    updated_ids = set()
-
-    for rider_id, name, current_points in riders:
-        if rider_id in updated_ids:
-            continue
-
-        print(f"\n{name} (Current points: {current_points})")
-        response = input("Enter new points, or type 'skip' or 'exit': ").strip()
-
-        if response.lower() == 'exit':
-            print("Exiting update session.")
+    for rider_id, name in riders:
+        while True:
+            points_input = input(f"Enter points earned by {name} (or 'skip'): ").strip()
+            if points_input.lower() == "skip":
+                break
+            if not points_input.isdigit():
+                print("Invalid input. Enter a whole number or 'skip'.")
+                continue
+            points = int(points_input)
+            
+            # Insert or update rider_results table
+            cursor.execute("""
+                INSERT INTO rider_results (race_id, rider_id, points)
+                VALUES (?, ?, ?)
+                ON CONFLICT(race_id, rider_id) DO UPDATE SET points = excluded.points
+            """, (race_id, rider_id, points))
+            conn.commit()
             break
-        elif response.lower() == 'skip':
-            continue
 
-        if not response.isdigit():
-            print("Invalid input. Points must be a whole number.")
-            continue
+    print("\nAll rider results entered for this race.")
 
-        new_points = int(response)
-        cursor.execute("UPDATE riders SET points = ? WHERE rider_id = ?", (new_points, rider_id))
-        conn.commit()
-        updated_ids.add(rider_id)
-        print(f"{name}'s points updated to {new_points}.")
+    # Step 3: Update user race scores
+    update_user_race_scores(cursor, conn, race_id)
+    print("User race scores updated.\n")
+
 
 def admin_menu(cursor, conn):
     while True:
         print("\n--- Admin Panel ---")
-        print("1. Update rider points")
-        print("2. Exit admin panel")
+        print("1. Update rider points and race scores")
+        print("2. commit results to leaderboard")
+        print("3. Exit admin panel")
 
-        choice = input("Enter your choice: ")
+        choice = input("Enter your choice: ").strip()
 
         if choice == '1':
-            update_rider_points(cursor, conn)
+            # Show all races
+            cursor.execute("SELECT id, date, location FROM races ORDER BY date")
+            races = cursor.fetchall()
+
+            if not races:
+                print("No races found.")
+                continue
+
+            print("\nSelect a race to update:")
+            for i, (race_id, date, location) in enumerate(races, start=1):
+                print(f"{i}. {location} on {date}")
+
+            race_choice = input("Enter the number of the race: ").strip()
+            if not race_choice.isdigit() or int(race_choice) < 1 or int(race_choice) > len(races):
+                print("Invalid selection.")
+                continue
+
+            race_id = races[int(race_choice) - 1][0]
+
+            # Update rider points
+            update_rider_results(cursor, conn)
+
+            # Update user scores for this race
+            update_user_race_scores(cursor, conn, race_id)
+
+            print(f"User scores updated for race ID {race_id}.\n")
+        
         elif choice == '2':
+            # Show all races
+            cursor.execute("SELECT id, date, location FROM races ORDER BY date")
+            races = cursor.fetchall()
+
+            if not races:
+                print("No races found.")
+                continue
+
+            print("\nSelect a race to commit to leaderboard:")
+            for i, (race_id, date, location) in enumerate(races, start=1):
+                print(f"{i}. {location} on {date}")
+
+            race_choice = input("Enter the number of the race: ").strip()
+            if not race_choice.isdigit() or int(race_choice) < 1 or int(race_choice) > len(races):
+                print("Invalid selection.")
+                continue
+
+            race_id = races[int(race_choice) - 1][0]
+
+            update_user_race_scores(cursor, conn, race_id)
+            print(f"Leaderboard updated for race ID {race_id}.")
+
+        elif choice == '3':
             print("Exiting admin panel...\n")
             break
         else:
             print("Invalid option. Please enter 1 or 2.")
+
 
 def display_available_riders(cursor, team, remaining_budget, num_men, num_women, gender_filter=None):
     selected_ids = [rider[0] for rider in team]
@@ -195,7 +270,7 @@ def view_team(cursor, user, team=None):
     total_cost = sum(rider[2] for rider in team)
     sorted_team = sorted(team, key=lambda rider: (rider[3] == 'F', -rider[4]))
 
-    print("\nYour Fantasy Team:\n")
+    print(f"\n{user[1]}'s Fantasy Team:\n")
     print("No.  | Name                  | Cost     | Points   | Gender")
     print("---------------------------------------------------------------")
     for i, (rider_id, name, cost, gender, points) in enumerate(sorted_team, start=1):
@@ -368,23 +443,30 @@ def build_team(cursor, conn, user):
 
 
 def delete_team(cursor, conn, user):
+    confirm = input("\nAre you sure you want to delete your entire team? (Press 1 to confirm, 2 to cancel): ").strip()
+
+    if confirm != "1":
+        print("\nTeam deletion cancelled.\n")
+        return
+
     cursor.execute("DELETE FROM user_teams WHERE user_id = ?", (user[0],))
     conn.commit()
-    print("Your team has been deleted.")
+    print("\nYour team has been deleted.\n")
+
 
 def view_leaderboard(cursor):
-    cursor.execute("SELECT username, total_points FROM leaderboard_view;")
+    cursor.execute("""
+        SELECT u.username, SUM(s.points) as total_points
+        FROM user_race_scores s
+        JOIN users u ON u.user_id = s.user_id
+        GROUP BY s.user_id
+        ORDER BY total_points DESC
+    """)
+    for username, points in cursor.fetchall():
+        print(f"{username}: {points} points")
 
-    results = cursor.fetchall()
-
-    print("FinnBike Fantasy Leaderboard")
-    for position, (username, points) in enumerate(results, start=1):
-        print(f"{position}. {username} - {points} points")
 
 from datetime import datetime
-
-def show_race_calendar(cursor):
-    from datetime import datetime
 
 def display_race_calendar(cursor):
     cursor.execute("SELECT date, location FROM races ORDER BY date")
@@ -445,6 +527,45 @@ TIPS:
         print("")
         print(section.strip())
         input("\nPress Enter to continue > ")
+
+
+def update_user_race_scores(cursor, conn, race_id):
+    """
+    After a race is completed, calculate and store points for each user.
+    """
+
+    # Get rider results for this race
+    cursor.execute("""
+        SELECT rider_id, points
+        FROM rider_results
+        WHERE race_id = ?
+    """, (race_id,))
+    race_results = dict(cursor.fetchall())  # {rider_id: points}
+
+    # Get all users
+    cursor.execute("SELECT DISTINCT user_id FROM user_teams")
+    users = [row[0] for row in cursor.fetchall()]
+
+    for user_id in users:
+        # Get the riders in this user's team for the race
+        cursor.execute("""
+            SELECT rider_id
+            FROM user_teams
+            WHERE user_id = ?
+        """, (user_id,))
+        team_riders = [row[0] for row in cursor.fetchall()]
+
+        # Sum points for this user's riders
+        total_points = sum(race_results.get(rider_id, 0) for rider_id in team_riders)
+
+        # Insert into user_race_scores
+        cursor.execute("""
+            INSERT INTO user_race_scores (user_id, race_id, points)
+            VALUES (?, ?, ?)
+        """, (user_id, race_id, total_points))
+
+    conn.commit()
+
 
 
 def user_menu(cursor, conn, user):
