@@ -10,7 +10,7 @@ conn = sqlite3.connect('fantasy.DB')
 cursor = conn.cursor()
 
 def login_user(cursor):
-    username = input("Enter username: ")
+    username = input("\nEnter username: ")
     password = input("Enter password: ")
 
     cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
@@ -59,20 +59,29 @@ def create_account(cursor, conn):
 
 def login_or_register(cursor, conn):
     while True:
-        choice = input("Do you want to \n(1) Login \n(2) Create a new account? \nEnter 1 or 2: ")
+        # Display title and menu
+        print("\033[30m=========================\033[0m")  # Black underline
+        print("\033[30m   FinnBike Fantasy\033[0m")        # Black title
+        print("\033[30m=========================\033[0m")  # Black underline
+        print("\nPlease choose an option:")
+        print("\033[94m1.\033[0m Login")
+        print("\033[94m2.\033[0m Create a new account")
+        
+        choice = input("\nEnter 1 or 2: ").strip()
 
         if choice == '1':
             user = login_user(cursor)
             if user:
                 return user
             else:
-                print("Login failed, please try again.")
+                print("\nLogin failed. Please try again.\n")
         elif choice == '2':
             user = create_account(cursor, conn)
             tutorial()
             return user
         else:
-            print("Invalid input. Please enter 1 or 2.")
+            print("\nInvalid input. Please enter 1 or 2.\n")
+
 
 def tutorial():
     sections = [
@@ -82,28 +91,28 @@ Your goal is to build the best team within your budget and finish the season wit
         """,
 
         """
-TEAM CREATION:
+TEAM CREATION
 - Budget Limit: You have a fixed budget of 1.5 million to spend on riders.
 - Team Size: You must fill all 6 spots in your team.
-- Gender Rules: You must have 4 male, and 2 female riders in your team.
+- Gender Rules: You must have 4 male and 2 female riders in your team.
 - Costs: Each rider has a unique cost, so choose wisely to balance talent and budget.
         """,
 
         """
-SCORING:
-- Riders earn points based on their real-life race result.
-- Your total score is the points your riders earned in races while they were on your team, added together.
+SCORING
+- Riders earn points based on their real-life race results.
+- Your total score is the points your riders earned in races while they were on your team.
         """,
 
         """
-LEADERBOARDS:
+LEADERBOARDS
 - Shows the top players and their scores.
 - Updates after each event or scoring period.
 - Ties are broken by total budget spent (less spent wins).
         """,
 
         """
-TIPS:
+TIPS
 - Watch your budget — once it's gone, you can't add more riders.
 - Balance proven riders with potential rising stars.
 - Keep an eye on your competitors' scores.
@@ -111,9 +120,15 @@ TIPS:
     ]
 
     for section in sections:
-        print("")
-        print(section.strip())
+        lines = section.strip().split("\n")
+        title = lines[0].strip()
+        content = "\n".join(lines[1:]).strip()
+
+        print(f"\n--- {title} ---")
+        if content:
+            print(content)
         input("\nPress Enter to continue > ")
+
 
 def load_user_team(cursor, user_id):
     cursor.execute("""
@@ -324,7 +339,14 @@ def build_team(cursor, conn, user):
     view_team(cursor, user)
 
 def delete_team(cursor, conn, user):
-    confirm = input("\nAre you sure you want to delete your entire team? (Press 1 to confirm, 2 to cancel): ").strip()
+    BLUE = "\033[94m"
+    RESET = "\033[0m"
+
+    print("\nAre you sure you want to delete your entire team?\n")
+    print(f"{BLUE}1.{RESET} Yes - delete my team")
+    print(f"{BLUE}2.{RESET} No - cancel\n")
+
+    confirm = input("Enter 1 or 2: ").strip()
 
     if confirm != "1":
         print("\nTeam deletion cancelled.\n")
@@ -332,7 +354,10 @@ def delete_team(cursor, conn, user):
 
     cursor.execute("DELETE FROM user_teams WHERE user_id = ?", (user[0],))
     conn.commit()
-    print("\nYour team has been deleted.\n")
+
+    print("\nYour team has been deleted successfully.\n")
+
+
 
 def update_user_race_scores(cursor, conn, race_id):
     """
@@ -495,6 +520,13 @@ def admin_menu(cursor, conn):
             print("Invalid option. Please enter 1 or 2.")
 
 def view_leaderboard(cursor):
+    # Display heading
+    print("\n--- Leaderboard ---\n")  # Simple, clean heading
+
+    print("Rank | Username           | Points")
+    print("-------------------------------------")
+
+    # Fetch leaderboard data
     cursor.execute("""
         SELECT u.username, SUM(s.points) as total_points
         FROM user_race_scores s
@@ -502,8 +534,16 @@ def view_leaderboard(cursor):
         GROUP BY s.user_id
         ORDER BY total_points DESC
     """)
-    for username, points in cursor.fetchall():
-        print(f"{username}: {points} points")
+    
+    leaderboard = cursor.fetchall()
+    if not leaderboard:
+        print("No scores available yet.\n")
+        return
+
+    # Display leaderboard
+    for i, (username, points) in enumerate(leaderboard, start=1):
+        print(f"\033[94m{str(i).ljust(4)}\033[0m | {username.ljust(18)} | {points}")
+    print()
 
 def display_race_calendar(cursor):
     cursor.execute("SELECT date, location FROM races ORDER BY date")
@@ -527,13 +567,13 @@ def display_race_calendar(cursor):
 def user_menu(cursor, conn, user):
     while True:
         print("\n--- FinnBike Fantasy Menu ---\n")
-        print("1. Build Your Team")
-        print("2. View Your Team")
-        print("3. Delete Your Team")
-        print("4. View Leaderboard")
-        print("5. View Upcoming Races")
-        print("6. view tutorial")
-        print("7. Log Out\n")
+        print(f"\033[94m1.\033[0m Build Your Team")
+        print(f"\033[94m2.\033[0m View Your Team")
+        print(f"\033[94m3.\033[0m Delete Your Team")
+        print(f"\033[94m4.\033[0m View Leaderboard")
+        print(f"\033[94m5.\033[0m View Upcoming Races")
+        print(f"\033[94m6.\033[0m View Tutorial")
+        print(f"\033[94m7.\033[0m Log Out\n")
 
         choice = input("Select an option (1-7): ").strip()
 
@@ -553,7 +593,7 @@ def user_menu(cursor, conn, user):
             print("Logging out...\n")
             break
         else:
-            print("Invalid option. Please enter a number between 1 and 5.")
+            print("Invalid option. Please enter a number between 1 and 7.")
 
 def main():
     while True:
